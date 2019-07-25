@@ -103,6 +103,14 @@ class DatasetCatalog(object):
         "cityscapes_fine_instanceonly_seg_test_cocostyle": {
             "img_dir": "cityscapes/images",
             "ann_file": "cityscapes/annotations/instancesonly_filtered_gtFine_test.json"
+        },
+        "bdd100k_train": {
+            "img_dir": "/data6/SRIP19_SelfDriving/bdd100k/images/100k/train",
+            "ann_file": "/data6/SRIP19_SelfDriving/bdd100k/annotations/bdd100k_labels_images_det_coco_train.json"
+        }, 
+        "bdd100k_val": {
+            "img_dir": "/data6/SRIP19_SelfDriving/bdd100k/images/100k/val",
+            "ann_file": "/data6/SRIP19_SelfDriving/bdd100k/annotations/bdd100k_labels_images_det_coco_val.json"
         }
     }
 
@@ -128,6 +136,17 @@ class DatasetCatalog(object):
             )
             return dict(
                 factory="PascalVOCDataset",
+                args=args,
+            )
+        elif "bdd" in name:
+            data_dir = DatasetCatalog.DATA_DIR
+            attrs = DatasetCatalog.DATASETS[name]
+            args = dict(
+                root = attrs["img_dir"],
+                ann_file = attrs["ann_file"],
+            )
+            return dict(
+                factory="Bdd100kDataset",
                 args=args,
             )
         raise RuntimeError("Dataset not available: {}".format(name))
