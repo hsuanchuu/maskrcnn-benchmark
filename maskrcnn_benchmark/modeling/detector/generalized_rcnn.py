@@ -4,6 +4,7 @@ Implements the Generalized R-CNN framework
 """
 
 import torch
+import logging
 from torch import nn
 
 from maskrcnn_benchmark.structures.image_list import to_image_list
@@ -47,6 +48,9 @@ class GeneralizedRCNN(nn.Module):
             raise ValueError("In training mode, targets should be passed")
         images = to_image_list(images)
         features = self.backbone(images.tensors)
+        # print(type(features))
+        logger = logging.getLogger("tmp")
+        logger.info(len(features))
         proposals, proposal_losses = self.rpn(images, features, targets)
         if self.roi_heads:
             x, result, detector_losses = self.roi_heads(features, proposals, targets)

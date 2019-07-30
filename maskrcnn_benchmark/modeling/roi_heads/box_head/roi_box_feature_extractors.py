@@ -43,6 +43,7 @@ class ResNet50Conv5ROIFeatureExtractor(nn.Module):
     def forward(self, x, proposals):
         x = self.pooler(x, proposals)
         x = self.head(x)
+        #print(x.shape)
         return x
 
 
@@ -72,12 +73,13 @@ class FPN2MLPFeatureExtractor(nn.Module):
         self.out_channels = representation_size
 
     def forward(self, x, proposals):
-        x = self.pooler(x, proposals)
-        x = x.view(x.size(0), -1)
+        self.pool_feature = self.pooler(x, proposals)
+        print(self.pool_feature.shape)
+        x = self.pool_feature.view(self.pool_feature.size(0), -1)
 
         x = F.relu(self.fc6(x))
         x = F.relu(self.fc7(x))
-
+        print("FPN2MLPFeatureExtractor")
         return x
 
 
@@ -141,6 +143,8 @@ class FPNXconv1fcFeatureExtractor(nn.Module):
         x = self.xconvs(x)
         x = x.view(x.size(0), -1)
         x = F.relu(self.fc6(x))
+        print("FPNXconv1FC")
+        print(x.shape)
         return x
 
 

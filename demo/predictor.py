@@ -138,6 +138,7 @@ class COCODemo(object):
     ):
         self.cfg = cfg.clone()
         self.model = build_detection_model(cfg)
+        print(self.model)
         self.model.eval()
         self.device = torch.device(cfg.MODEL.DEVICE)
         self.model.to(self.device)
@@ -226,6 +227,10 @@ class COCODemo(object):
                 of the detection properties can be found in the fields of
                 the BoxList via `prediction.fields()`
         """
+        self.pool_feature = []
+        self.global_feature = []
+        def hook(module, input, output):
+            self.global_feature = module.backbone.fpn.global_feature
         # apply pre-processing to image
         image = self.transforms(original_image)
         # convert to an ImageList, padded so that it is divisible by
@@ -234,7 +239,9 @@ class COCODemo(object):
         image_list = image_list.to(self.device)
         # compute predictions
         with torch.no_grad():
+            handle = self.model.register_forward_hook(hook)
             predictions = self.model(image_list)
+        print(self.global_feature.shape)
         predictions = [o.to(self.cpu_device) for o in predictions]
 
         # always single image is passed at a time

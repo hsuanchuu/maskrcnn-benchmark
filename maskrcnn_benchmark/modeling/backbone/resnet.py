@@ -149,6 +149,7 @@ class ResNet(nn.Module):
             x = getattr(self, stage_name)(x)
             if self.return_features[stage_name]:
                 outputs.append(x)
+                #print(stage_name, x.shape)
         return outputs
 
 

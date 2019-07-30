@@ -2,6 +2,7 @@
 from .coco import COCODataset
 from .voc import PascalVOCDataset
 from .bdd100k import Bdd100kDataset
+from .bdd_action import BddActionDataset
 from .concat_dataset import ConcatDataset
 
-__all__ = ["COCODataset", "ConcatDataset", "PascalVOCDataset", "Bdd100kDataset", "BDDDataset"]
+__all__ = ["COCODataset", "ConcatDataset", "PascalVOCDataset", "Bdd100kDataset", "BddActionDataset"]

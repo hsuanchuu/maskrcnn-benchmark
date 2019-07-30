@@ -22,8 +22,8 @@ MODEL:
     PREDICTOR: "FPNPredictor"
     NUM_CLASSES: 11
 DATASETS:
-  TRAIN: ("bdd100k_train",)
-  TEST: ("bdd100k_val",)
+  TRAIN: ("bdd_action_train",)
+  TEST: ("bdd_action_val",)
 DATALOADER:
   SIZE_DIVISIBILITY: 32
 SOLVER:
@@ -31,6 +31,6 @@ SOLVER:
   WEIGHT_DECAY: 0.0001
   STEPS: (60000, 80000)
   MAX_ITER: 90000
-  IMS_PER_BATCH: 4
+  IMS_PER_BATCH: 1
   CHECKPOINT_PERIOD: 5000
 OUTPUT_DIR: "/data6/SRIP_SelfDriving/Outputs/"

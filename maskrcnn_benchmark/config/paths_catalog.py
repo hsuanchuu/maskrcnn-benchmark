@@ -105,12 +105,20 @@ class DatasetCatalog(object):
             "ann_file": "cityscapes/annotations/instancesonly_filtered_gtFine_test.json"
         },
         "bdd100k_train": {
-            "img_dir": "/data6/SRIP19_SelfDriving/bdd100k/images/100k/train",
-            "ann_file": "/data6/SRIP19_SelfDriving/bdd100k/annotations/bdd100k_labels_images_det_coco_train.json"
+            "img_dir": "bdd100k/images/100k/train",
+            "ann_file": "bdd100k/annotations/bdd100k_labels_images_det_coco_train.json"
         }, 
         "bdd100k_val": {
-            "img_dir": "/data6/SRIP19_SelfDriving/bdd100k/images/100k/val",
-            "ann_file": "/data6/SRIP19_SelfDriving/bdd100k/annotations/bdd100k_labels_images_det_coco_val.json"
+            "img_dir": "bdd100k/images/100k/val",
+            "ann_file": "bdd100k/annotations/bdd100k_labels_images_det_coco_val.json"
+        },
+        "bdd_action_train": {
+            "img_dir": "bdd100k/images/100k/train",
+            "ann_file": "bdd100k/annotations/train_gt_action.json"
+        }, 
+        "bdd_action_val": {
+            "img_dir": "bdd100k/images/100k/val",
+            "ann_file": "bdd100k/annotations/val_gt_action.json"
         }
     }
 
@@ -138,15 +146,26 @@ class DatasetCatalog(object):
                 factory="PascalVOCDataset",
                 args=args,
             )
-        elif "bdd" in name:
+        elif "bdd100k" in name:
             data_dir = DatasetCatalog.DATA_DIR
             attrs = DatasetCatalog.DATASETS[name]
             args = dict(
-                root = attrs["img_dir"],
-                ann_file = attrs["ann_file"],
+                root=os.path.join(data_dir, attrs["img_dir"]),
+                ann_file=os.path.join(data_dir, attrs["ann_file"]),
             )
             return dict(
                 factory="Bdd100kDataset",
+                args=args,
+            )
+        elif "bdd_action" in name:
+            data_dir = DatasetCatalog.DATA_DIR
+            attrs = DatasetCatalog.DATASETS[name]
+            args = dict(
+                root=os.path.join(data_dir, attrs["img_dir"]),
+                ann_file=os.path.join(data_dir, attrs["ann_file"]),
+            )
+            return dict(
+                factory="BddActionDataset",
                 args=args,
             )
         raise RuntimeError("Dataset not available: {}".format(name))

@@ -70,6 +70,7 @@ class FPN(nn.Module):
         elif isinstance(self.top_blocks, LastLevelMaxPool):
             last_results = self.top_blocks(results[-1])
             results.extend(last_results)
+        self.global_feature = results[0]
 
         return tuple(results)
 
