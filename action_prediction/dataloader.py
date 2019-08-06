@@ -9,18 +9,20 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 from torch.autograd import Variable
+import torchvision.transforms as transforms
 import os.path as osp
 from PIL import Image
 import json
 import random
 
 class BatchLoader(Dataset):
-    def __init__(self, imageRoot, gtRoot, cropSize=(1280, 720)):
+    def __init__(self, imageRoot, gtRoot, batchSize=1, cropSize=(1280, 720)):
         super(BatchLoader, self).__init__()
         
         self.imageRoot = imageRoot
         self.gtRoot = gtRoot
         self.cropSize = cropSize
+        self.batchsize = batchSize
         
         with open(gtRoot) as json_file:
             data = json.load(json_file)
@@ -29,9 +31,12 @@ class BatchLoader(Dataset):
         action_annotations = data['annotations']
         imgNames = data['images']
         self.imgNames, self.targets = [], []
+        forward_sample = 0
         for i, img in enumerate(imgNames):
-            self.imgNames.append(osp.join(self.imageRoot, img['file_name']))
-            self.targets.append(int(action_annotations[i]['category_id']))
+            if not (int(action_annotations[i]['category_id']) == 0 and forward_sample > 1000):
+                self.imgNames.append(osp.join(self.imageRoot, img['file_name']))
+                self.targets.append(int(action_annotations[i]['category_id']))
+                forward_sample += 1
         
         
         self.count = len(self.imgNames)
@@ -49,7 +54,6 @@ class BatchLoader(Dataset):
         img = np.array(Image.open(imgName))
         img = np.transpose(img, (2, 0, 1))
         img = torch.Tensor(img)
-        
         batchDict = {
                 'img': img,
                 'target': target
@@ -87,17 +91,17 @@ def toDivisibility(img_list):
 #
 #     return target
 
-def one_hot(label, C=4):
-    one_hot_t = torch.LongTensor(1, C) % 3
-    one_hot_t = one_hot_t.zero_()
-    if label == 0:
-        one_hot_t[0, 0] = 1
-    elif label == 1:
-        one_hot_t[0, 1] = 1
-    elif label == 2:
-        one_hot_t[0, 2] = 1
-    elif label == 3:
-        one_hot_t[0, 3] = 1
-
-    return one_hot_t
+# def one_hot(label, C=4):
+#     one_hot_t = torch.LongTensor(1, C) % 3
+#     one_hot_t = one_hot_t.zero_()
+#     if label == 0:
+#         one_hot_t[0, 0] = 1
+#     elif label == 1:
+#         one_hot_t[0, 1] = 1
+#     elif label == 2:
+#         one_hot_t[0, 2] = 1
+#     elif label == 3:
+#         one_hot_t[0, 3] = 1
+#
+#     return one_hot_t
 

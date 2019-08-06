@@ -103,13 +103,15 @@ class ResNet(nn.Module):
         self.stages = []
         self.return_features = {}
         for stage_spec in stage_specs:
+            # build layers
             name = "layer" + str(stage_spec.index)
             stage2_relative_factor = 2 ** (stage_spec.index - 1)
             bottleneck_channels = stage2_bottleneck_channels * stage2_relative_factor
             out_channels = stage2_out_channels * stage2_relative_factor
             stage_with_dcn = cfg.MODEL.RESNETS.STAGE_WITH_DCN[stage_spec.index -1]
+            # build specific module
             module = _make_stage(
-                transformation_module,
+                transformation_module, #
                 in_channels,
                 bottleneck_channels,
                 out_channels,

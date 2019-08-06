@@ -28,7 +28,7 @@ def main():
     parser = argparse.ArgumentParser(description="PyTorch Object Detection Inference")
     parser.add_argument(
         "--config-file",
-        default="/private/home/fmassa/github/detectron.pytorch_v2/configs/e2e_faster_rcnn_R_50_C4_1x_caffe2.yaml",
+        default="/home/SelfDriving/maskrcnn/maskrcnn-benchmark/configs/get_feature.yaml",
         metavar="FILE",
         help="path to config file",
     )
@@ -43,6 +43,12 @@ def main():
         help="Modify config options using the command-line",
         default=None,
         nargs=argparse.REMAINDER,
+    )
+    parser.add_argument(
+        "--get_feature",
+        help="get roi features and save",
+        action='store_true',
+        default=False,
     )
 
     args = parser.parse_args()
@@ -105,6 +111,7 @@ def main():
             expected_results=cfg.TEST.EXPECTED_RESULTS,
             expected_results_sigma_tol=cfg.TEST.EXPECTED_RESULTS_SIGMA_TOL,
             output_folder=output_folder,
+            get_feature=args.get_feature,
         )
         synchronize()
 

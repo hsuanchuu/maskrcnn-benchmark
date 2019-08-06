@@ -3,7 +3,9 @@ import logging
 import time
 import os
 
+import numpy as np
 import torch
+import torch.nn as nn
 from tqdm import tqdm
 
 from maskrcnn_benchmark.config import cfg
@@ -14,11 +16,32 @@ from ..utils.comm import synchronize
 from ..utils.timer import Timer, get_time_str
 from .bbox_aug import im_detect_bbox_aug
 
+class SimpleHook(object):
+    """
+    A simple hook function to extract features.
+    :return:
+    """
+    def __init__(self, module, backward=False):
+        # super(SimpleHook, self).__init__()
+        if not backward:
+            self.hook = module.register_forward_hook(self.hook_fn)
+        else:
+            self.hook = module.register_backward_hook(self.hook_fn)
 
-def compute_on_dataset(model, data_loader, device, timer=None):
+    def hook_fn(self, module, input_, output_):
+        self.input = input_
+        self.output = output_
+
+    def close(self):
+        self.hook.remove()
+
+def compute_on_dataset(model, data_loader, device, timer=None, get_feature=False):
     model.eval()
     results_dict = {}
     cpu_device = torch.device("cpu")
+    RoIPool = model.roi_heads.box.feature_extractor.pooler
+    Backbone = model.backbone
+
     for _, batch in enumerate(tqdm(data_loader)):
         images, targets, image_ids = batch
         with torch.no_grad():
@@ -27,7 +50,24 @@ def compute_on_dataset(model, data_loader, device, timer=None):
             if cfg.TEST.BBOX_AUG.ENABLED:
                 output = im_detect_bbox_aug(model, images, device)
             else:
-                output = model(images.to(device))
+                if get_feature:
+                    t = [target.to(device) for target in targets]
+                    hook_roi = SimpleHook(RoIPool)
+                    hook_backbone = SimpleHook(Backbone)
+                    output = model(images.to(device), t, get_feature)
+                    features_roi = hook_roi.output.data
+                    features_backbone = hook_backbone.output[0].data
+                    avgpool = nn.AdaptiveAvgPool2d((14,14))
+                    features_backbone = avgpool(features_backbone)
+                    if(features_roi.shape[0] == 0):
+                        features = features_backbone
+                    else:
+                        features = torch.cat((features_roi, features_backbone),dim=0)
+                    folder = "/data6/SRIP19_SelfDriving/bdd100k/features/train/"
+                    np.save(folder + str(image_ids[0]) + '.npy',features.cpu().numpy())
+                    hook_roi.close()
+                else:
+                    output = model(images.to(device))
             if timer:
                 if not cfg.MODEL.DEVICE == 'cpu':
                     torch.cuda.synchronize()
@@ -71,7 +111,12 @@ def inference(
         expected_results=(),
         expected_results_sigma_tol=4,
         output_folder=None,
+        get_feature=False,
 ):
+    """
+
+    :rtype:
+    """
     # convert to a torch.device for efficiency
     device = torch.device(device)
     num_devices = get_world_size()
@@ -81,7 +126,7 @@ def inference(
     total_timer = Timer()
     inference_timer = Timer()
     total_timer.tic()
-    predictions = compute_on_dataset(model, data_loader, device, inference_timer)
+    predictions = compute_on_dataset(model, data_loader, device, inference_timer, get_feature)
     # wait for all processes to complete before measuring the time
     synchronize()
     total_time = total_timer.toc()

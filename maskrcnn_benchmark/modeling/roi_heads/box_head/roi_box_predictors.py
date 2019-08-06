@@ -51,10 +51,10 @@ class FPNPredictor(nn.Module):
         if x.ndimension() == 4:
             assert list(x.shape[2:]) == [1, 1]
             x = x.view(x.size(0), -1)
-        scores = self.cls_score(x)
+        self.scores = self.cls_score(x)
         bbox_deltas = self.bbox_pred(x)
 
-        return scores, bbox_deltas
+        return self.scores, bbox_deltas
 
 
 def make_roi_box_predictor(cfg, in_channels):

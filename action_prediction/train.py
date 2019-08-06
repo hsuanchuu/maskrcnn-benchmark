@@ -13,11 +13,13 @@ import torch.nn as nn
 from torch.autograd import Variable
 from torch.utils.data import DataLoader
 import numpy as np
+from sklearn.preprocessing import normalize
 
 from maskrcnn_benchmark.config import cfg
 from maskrcnn_benchmark.utils.logger import setup_logger
 from maskrcnn_benchmark.utils.miscellaneous import mkdir
 from maskrcnn_benchmark.modeling.detector import build_detection_model
+from maskrcnn_benchmark.utils.checkpoint import DetectronCheckpointer
 from maskrcnn_benchmark.structures.image_list import to_image_list
 
 from baseline import baseline
@@ -27,18 +29,24 @@ import torch.optim as optim
 
 def train(cfg, args):
     detector = build_detection_model(cfg)
-    # print(detector)
+    #print(detector)
     detector.eval()
     device = torch.device(cfg.MODEL.DEVICE)
     detector.to(device)
     outdir = cfg.OUTPUT_DIR
-    
+
+    checkpointer = DetectronCheckpointer(cfg, detector, save_dir=outdir)
+    ckpt = cfg.MODEL.WEIGHT
+    _ = checkpointer.load(ckpt)
+
     # Initialize the network
     model = baseline()
-    criterion = nn.CrossEntropyLoss()
+    class_weights = [1, 1, 5, 5] # could be adjusted
+    class_weights = torch.FloatTensor(class_weights).to(device)
+    criterion = nn.CrossEntropyLoss(weight=class_weights)
     
     # Initialize optimizer
-    optimizer = optim.SGD(model.parameters(), lr=args.initLR, momentum=0.9, weight_decay=5e-4)
+    optimizer = optim.Adam(model.parameters(), lr=float(args.initLR), weight_decay=0.001)
     
     # Initialize image batch
     # imBatch = Variable(torch.FloatTensor(args.batch_size, 3, args.imHeight, args.imWidth))
@@ -56,7 +64,7 @@ def train(cfg, args):
             gtRoot = args.gtroot,
             cropSize = (args.imWidth, args.imHeight)
             )
-    dataloader = DataLoader(Dataset, batch_size=args.batch_size, num_workers=0, shuffle=True)
+    dataloader = DataLoader(Dataset, batch_size=int(args.batch_size), num_workers=0, shuffle=True)
     
     lossArr = []
     AccuracyArr = []
@@ -65,8 +73,9 @@ def train(cfg, args):
     
     for epoch in range(0, 10):
         trainingLog = open(outdir + ('trainingLog_{0}.txt'.format(epoch)), 'w')
+        accuracy = 0
         for i, dataBatch in enumerate(dataloader):
-            iteration += 1
+            iteration = i + 1
             
             # Read data, under construction
             img_cpu = dataBatch['img']
@@ -84,24 +93,32 @@ def train(cfg, args):
             
             # Train network
             RoIPool_module = detector.roi_heads.box.feature_extractor.pooler
+            RoIPredictor = detector.roi_heads.box.predictor
+            RoIProc = detector.roi_heads.box.post_processor
             Backbone = detector.backbone
             hook_roi = SimpleHook(RoIPool_module)
             hook_backbone = SimpleHook(Backbone)
+            hook_pred = SimpleHook(RoIPredictor)
+            hook_proc = SimpleHook(RoIProc)
             out_detector = detector(imBatch)
             features_roi = hook_roi.output.data
             features_backbone = hook_backbone.output[0].data # only use the bottom one
-            # features = detector(imBatch) # features extracted by ROI pooling/align
+            # choose boxes with high scores
+            thresh = 10
+            cls_logit = hook_pred.output[0].data
+            cls_logit = torch.max(cls_logit, dim=1)
+            ind = torch.ge(cls_logit[0], torch.FloatTensor([thresh]).to(device))
+            features_roi = features_roi[ind]
             optimizer.zero_grad()
             
             # pred = model(features_roi, features_backbone)
             pred = model(features_roi, features_backbone)
-            print('prediction:', pred)
+
             # print('target:', targetBatch[0,:][0])
             loss = criterion(pred, targetBatch[0,:])
             action = pred.cpu().argmax().data.numpy()
 
-            print('predicted action:', action)
-            print('ground truth:', target_cpu.data.numpy()[0])
+
 
             loss.backward()
             
@@ -113,28 +130,33 @@ def train(cfg, args):
             AccuracyArr.append(accuracy/iteration)
 
             meanLoss = np.mean(np.array(lossArr))
+            if iteration%100 == 0:
+                print('prediction:', pred)
+                print('predicted action:', action)
+                print('ground truth:', target_cpu.data.numpy()[0])
+                print('Epoch %d Iteration %d: Loss %.5f Accumulated Loss %.5f' % (epoch, iteration, lossArr[-1], meanLoss ))
 
-            print('Epoch %d Iteration %d: Loss %.5f Accumulated Loss %.5f' % (epoch, iteration, lossArr[-1], meanLoss ))
-            trainingLog.write('Epoch %d Iteration %d: Loss %.5f Accumulated Loss %.5f' % (epoch, iteration, lossArr[-1], meanLoss ))
+                trainingLog.write('Epoch %d Iteration %d: Loss %.5f Accumulated Loss %.5f \n' % (epoch, iteration, lossArr[-1], meanLoss ))
 
-            print('Epoch %d Iteration %d: Accumulated Accuracy %.5f' % (epoch, iteration, AccuracyArr[-1]))
-            trainingLog.write('Epoch %d Iteration %d: Accumulated Accuracy %.5f' % (epoch, iteration, AccuracyArr[-1]))
+                print('Epoch %d Iteration %d: Accumulated Accuracy %.5f' % (epoch, iteration, AccuracyArr[-1]))
+                trainingLog.write('Epoch %d Iteration %d: Accumulated Accuracy %.5f \n' % (epoch, iteration, AccuracyArr[-1]))
             
             
-            if iteration in [20000,40000]:
+            if epoch in [4,7] and iteration == 1:
                 print('The learning rate is being decreased at Iteration %d', iteration)
-                trainingLog.write('The learning rate is being decreased at Iteration %d', iteration)
+                trainingLog.write('The learning rate is being decreased at Iteration %d \n' % iteration)
                 for param_group in optimizer.param_groups:
                     param_group['lr'] /= 10
                     
             if iteration == args.MaxIteration:
-                torch.save(model.state_dict(), 'netFinal_%d.pth' % (epoch+1))
+                torch.save(model.state_dict(), (outdir + 'netFinal_%d.pth' % (epoch+1)))
                 break
-        if iteration >= args.MaxItertion:
+                
+        if iteration >= args.MaxIteration:
             break
         
         if (epoch+1) % 2 == 0:
-            torch.save(model.state_dict(), 'netFinal_%d.pth' % (epoch+1))
+            torch.save(model.state_dict(), (outdir + 'netFinal_%d.pth' % (epoch+1)))
             
 class SimpleHook(object):
     """
@@ -196,13 +218,13 @@ def main():
     parser.add_argument(
         "--imageroot",
         type=str,
-        help="Directory of the images",
+        help="Directory to the images",
         default="/home/SelfDriving/maskrcnn/maskrcnn-benchmark/datasets/bdd100k/images/100k/train"
     )
     parser.add_argument(
         "--gtroot",
         type=str,
-        help="Directory of the groundtruth",
+        help="Directory to the groundtruth",
         default="/home/SelfDriving/maskrcnn/maskrcnn-benchmark/datasets/bdd100k/annotations/train_gt_action.json"
     )
     parser.add_argument(
@@ -233,7 +255,6 @@ def main():
     
     args = parser.parse_args()
     print(args)
-    cfg.MODEL.WEIGHT = "/data6/SRIP_SelfDriving/Outputs/model_final.pth"
     cfg.merge_from_file(args.config_file)
     cfg.merge_from_list(args.opts)
     cfg.freeze()

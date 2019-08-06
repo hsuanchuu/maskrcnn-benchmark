@@ -35,6 +35,7 @@ except ImportError:
 
 def train(cfg, local_rank, distributed):
     model = build_detection_model(cfg)
+    print(model.roi_heads)
     device = torch.device(cfg.MODEL.DEVICE)
     model.to(device)
 
@@ -124,7 +125,7 @@ def main():
     parser = argparse.ArgumentParser(description="PyTorch Object Detection Training")
     parser.add_argument(
         "--config-file",
-        default="",
+        default="/home/SelfDriving/maskrcnn/maskrcnn-benchmark/configs/e2e_faster_rcnn_R_50_C4_1x.yaml",
         metavar="FILE",
         help="path to config file",
         type=str,

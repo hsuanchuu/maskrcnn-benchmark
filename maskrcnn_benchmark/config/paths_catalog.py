@@ -119,7 +119,15 @@ class DatasetCatalog(object):
         "bdd_action_val": {
             "img_dir": "bdd100k/images/100k/val",
             "ann_file": "bdd100k/annotations/val_gt_action.json"
-        }
+        },
+        "bdd100k_train_s": {
+            "img_dir": "bdd100k/images/100k/train",
+            "ann_file": "bdd100k/annotations/bdd100k_labels_images_det_coco_train_s.json"
+        },
+        "bdd100k_val_s": {
+            "img_dir": "bdd100k/images/100k/val",
+            "ann_file": "bdd100k/annotations/bdd100k_labels_images_det_coco_val_s.json"
+        },
     }
 
     @staticmethod

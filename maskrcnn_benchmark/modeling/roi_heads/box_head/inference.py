@@ -41,6 +41,7 @@ class PostProcessor(nn.Module):
         self.box_coder = box_coder
         self.cls_agnostic_bbox_reg = cls_agnostic_bbox_reg
         self.bbox_aug_enabled = bbox_aug_enabled
+        self.box_per_img = []
 
     def forward(self, x, boxes):
         """
@@ -60,6 +61,7 @@ class PostProcessor(nn.Module):
         # TODO think about a representation of batch of boxes
         image_shapes = [box.size for box in boxes]
         boxes_per_image = [len(box) for box in boxes]
+
         concat_boxes = torch.cat([a.bbox for a in boxes], dim=0)
 
         if self.cls_agnostic_bbox_reg:
