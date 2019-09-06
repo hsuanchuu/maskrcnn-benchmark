@@ -128,6 +128,18 @@ class DatasetCatalog(object):
             "img_dir": "bdd100k/images/100k/val",
             "ann_file": "bdd100k/annotations/bdd100k_labels_images_det_coco_val_s.json"
         },
+        "bdd12k_action_train": {
+            "img_dir": "bdd12k/data1",
+            "ann_file": "bdd12k/annotations/12k_gt_train_5_actions.json"
+        }, 
+        "bdd12k_action_val": {
+            "img_dir": "bdd12k/data1",
+            "ann_file": "bdd100k/annotations/12k_gt_val_5_actions.json"
+        },
+        "bdd12k_action_test": {
+            "img_dir": "bdd12k/data1",
+            "ann_file": "bdd100k/annotations/12k_gt_test_5_actions.json"
+        },
     }
 
     @staticmethod
@@ -174,6 +186,17 @@ class DatasetCatalog(object):
             )
             return dict(
                 factory="BddActionDataset",
+                args=args,
+            )
+        elif "bdd12k_action" in name:
+            data_dir = DatasetCatalog.DATA_DIR
+            attrs = DatasetCatalog.DATASETS[name]
+            args = dict(
+                root=os.path.join(data_dir, attrs["img_dir"]),
+                ann_file=os.path.join(data_dir, attrs["ann_file"]),
+            )
+            return dict(
+                factory="Bdd12kActionDataset",
                 args=args,
             )
         raise RuntimeError("Dataset not available: {}".format(name))

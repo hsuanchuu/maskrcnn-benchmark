@@ -5,35 +5,36 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 from torch.utils.data import DataLoader
-import numpy as np
 
 from maskrcnn_benchmark.config import cfg
 from maskrcnn_benchmark.modeling.detector import build_detection_model
 from maskrcnn_benchmark.structures.image_list import to_image_list
 
+from train import SimpleHook
 from baseline_sub import baseline
-from dataLoader3 import BatchLoader
+from dataloader_sub import BatchLoader
 
 def test(cfg, args):
     # load detector
-    #device = torch.device(cfg.MODEL.DEVICE)
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+#    detector = build_detection_model(cfg)
+#    detector.eval()
+    device = torch.device(cfg.MODEL.DEVICE)
+#    detector.to(device)
     outdir = cfg.OUTPUT_DIR
 
     # load network
-    model = baseline(cfg)
+    model = baseline(cfg, is_cat=args.is_cat)
     model.load_state_dict(torch.load(args.model_root))
-    model.eval()
 
     # Initialize image batch
     # imBatch = Variable(torch.FloatTensor(args.batch_size, 3, args.imHeight, args.imWidth))
 #    imBatch = Variable(torch.FloatTensor(args.batch_size, 3, 736, 1280))
-    targetBatch = Variable(torch.LongTensor(args.batch_size))
+    targetBatch = Variable(torch.LongTensor(args.batch_size, 1))
 
     # Move network and batch to gpu
 #    imBatch = imBatch.cuda(device)
-    #targetBatch = targetBatch.cuda(device)
-    model = model.to(device)
+    targetBatch = targetBatch.cuda(device)
+    model = model.cuda(device)
 
     # Initialize dataloader
     Dataset = BatchLoader(
@@ -41,7 +42,7 @@ def test(cfg, args):
             gtRoot = args.gtroot,
             cropSize = (args.imWidth, args.imHeight)
             )
-    dataloader = DataLoader(Dataset, batch_size=args.batch_size, num_workers=4, shuffle=False)
+    dataloader = DataLoader(Dataset, batch_size=args.batch_size, num_workers=0, shuffle=True)
     length = Dataset.__len__()
 
     AccuracyArr = []
@@ -54,60 +55,42 @@ def test(cfg, args):
     TestingLog.write(str(args))
     for i, dataBatch in enumerate(dataloader):
         # Read data, under construction. now it is hard-code
-        img_cpu = dataBatch['img'][0]
-        # N = img_cpu.shape[0]
-        # imBatch = Variable(torch.FloatTensor(N, 1024, 14, 14))
-        # imBatch = imBatch.cuda(device)
-        # imBatch.data.copy_(img_cpu)  # Tensor.shape(BatchSize, 3, Height, Width)
-        imBatch = img_cpu.to(device)
-
-
+        img_cpu = dataBatch['img'][0,:]
+        N = img_cpu.shape[0]
+        imBatch = Variable(torch.FloatTensor(N, 1024, 14, 14))
+        imBatch = imBatch.cuda(device)
+        imBatch.data.copy_(img_cpu)  # Tensor.shape(BatchSize, 3, Height, Width)
+            
         target_cpu = dataBatch['target']
         # print(target_cpu)
-        #targetBatch.data.copy_(target_cpu)
-        targetBatch = target_cpu.to(device)
+        targetBatch.data.copy_(target_cpu)
 
         # grap features from detector
 
         pred = model(imBatch)
         action = pred.cpu().argmax(dim=1).data.numpy()
 
-        print('predicted action:', action)
-        print('ground truth:', target_cpu.data.numpy())
-        TestingLog.write('predicted action:' + str(action) + '\n')
-        TestingLog.write('ground truth:' + str(target_cpu.data.numpy()) + '\n')
-        accuracy = np.sum(action==targetBatch.cpu().data.numpy())
-        AccuracyArr.append(accuracy / args.batch_size)
-        meanAcc = np.mean(np.array(AccuracyArr))
+        print('predicted action:', action[0])
+        print('ground truth:', target_cpu.data.numpy()[0])
+        TestingLog.write('predicted action:' + str(action[0]) + '\n')
+        TestingLog.write('ground truth:' + str(target_cpu.data.numpy()[0]) + '\n')
 
-        print('Iteration %d / %d: Accumulated Accuracy %.5f' % (i + 1, length, meanAcc))
-        TestingLog.write('Iteration %d / %d: Accumulated Accuracy %.5f \n' % (i + 1, length, meanAcc))
+        if action == target_cpu.data.numpy()[0]:
+            accuracy += 1
 
-class SimpleHook(object):
-    """
-    A simple hook function to extract features.
-    :return:
-    """
-    def __init__(self, module, backward=False):
-        # super(SimpleHook, self).__init__()
-        if not backward:
-            self.hook = module.register_forward_hook(self.hook_fn)
-        else:
-            self.hook = module.register_backward_hook(self.hook_fn)
+        AccuracyArr.append(accuracy/(i + 1))
 
-    def hook_fn(self, module, input_, output_):
-        self.input = input_
-        self.output = output_
+        print('Iteration %d / %d: Accumulated Accuracy %.5f' % (i + 1, length, AccuracyArr[-1]))
+        TestingLog.write('Iteration %d / %d: Accumulated Accuracy %.5f \n' % (i + 1, length, AccuracyArr[-1]))
 
-    def close(self):
-        self.hook.remove()
+
 
 def main():
     # Build a parser for arguments
     parser = argparse.ArgumentParser(description="Action Prediction Training")
     parser.add_argument(
         "--config-file",
-        default="/home/SelfDriving/maskrcnn/maskrcnn-benchmark/configs/baseline.yaml",
+        default="/home/SelfDriving/maskrcnn/maskrcnn-benchmark/configs/e2e_faster_rcnn_R_50_C4_1x.yaml",
         metavar="FILE",
         help="path to maskrcnn_benchmark config file",
         type=str,
@@ -117,6 +100,13 @@ def main():
         help="Modify config options using the command-line",
         default=None,
         nargs=argparse.REMAINDER,
+    )
+    parser.add_argument(
+        "--is_cat",
+        default=False,
+        help="If we use concatenation on object features",
+        type=bool,
+
     )
     parser.add_argument(
         "--imageroot",

@@ -123,7 +123,8 @@ def make_data_loader(cfg, is_train=True, is_distributed=False, start_iter=0):
         ), "TEST.IMS_PER_BATCH ({}) must be divisible by the number of GPUs ({}) used.".format(
             images_per_batch, num_gpus)
         images_per_gpu = images_per_batch // num_gpus
-        shuffle = False if not is_distributed else True
+        # shuffle = False if not is_distributed else True
+        shuffle = False
         num_iters = None
         start_iter = 0
 
@@ -153,6 +154,7 @@ def make_data_loader(cfg, is_train=True, is_distributed=False, start_iter=0):
 
     # If bbox aug is enabled in testing, simply set transforms to None and we will apply transforms later
     transforms = None if not is_train and cfg.TEST.BBOX_AUG.ENABLED else build_transforms(cfg, is_train)
+    # transforms = None # TODO: remember to change this back
     datasets = build_dataset(dataset_list, transforms, DatasetCatalog, is_train)
 
     if is_train:

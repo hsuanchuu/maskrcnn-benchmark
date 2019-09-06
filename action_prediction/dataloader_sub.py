@@ -35,11 +35,12 @@ class BatchLoader(Dataset):
         self.imgNames, self.targets = [], []
         forward_sample = 0
         for i, img in enumerate(imgNames):
-            if not (int(action_annotations[i]['category_id']) == 0 and forward_sample > 1000):
+            if int(action_annotations[i]['category_id']) == 0 or int(action_annotations[i]['category_id']) == 1:
+#            if not (int(action_annotations[i]['category_id']) == 0 and forward_sample > 1000):
                 f = str(int(img['id']) - 1) + '.npy'
                 self.imgNames.append(osp.join(self.imageRoot, f))
                 self.targets.append(int(action_annotations[i]['category_id']))
-                forward_sample += 1
+#                forward_sample += 1
 
         self.count = len(self.imgNames)
         self.perm = list(range(self.count))
@@ -51,61 +52,26 @@ class BatchLoader(Dataset):
     def __getitem__(self, ind):
         imgName = self.imgNames[self.perm[ind]]
         target = np.array(self.targets[self.perm[ind]], dtype=np.int64)
-        # target = one_hot(target, 4)
-
-        #img = np.array(Image.open(imgName))
-        #img = np.transpose(img, (2, 0, 1))
         img = np.load(imgName)
+
+        # transform = transforms.Compose([
+#         transforms.Resize(256),
+#         transforms.CenterCrop(224),
+#          transforms.ToTensor(),
+         # transforms.Normalize(
+         #  mean=[0.485, 0.456, 0.406],
+         #  std=[0.229, 0.224, 0.225])
+        # ])
+        
         img = torch.Tensor(img)
-        #img = toDivisibility(img)
-
-
+        # target = torch.LongTensor(target)
+        #img = np.array(img)
+        #img = np.transpose(img, (2, 0, 1))
         batchDict = {
             'img': img,
-            'target': target
+            'target': target,
         }
         return batchDict
 
 
-def toDivisibility(img, pad=(0,0,8,8)):
-    m = nn.ConstantPad2d(pad, 0)
-    return m(img)
-
-# def make_one_hot(labels, C=4):
-#     '''
-#     Converts an integer label torch.autograd.Variable to a one-hot Variable.
-#
-#     Parameters
-#     ----------
-#     labels : torch.autograd.Variable of torch.cuda.LongTensor
-#         N x 1 x H x W, where N is batch size.
-#         Each value is an integer representing correct classification.
-#     C : integer.
-#         number of classes in labels.
-#
-#     Returns
-#     -------
-#     target : torch.autograd.Variable of torch.cuda.FloatTensor
-#         N x C x H x W, where C is class number. One-hot encoded.
-#     '''
-#     one_hot = torch.cuda.FloatTensor(labels.size(0), C, labels.size(2), labels.size(3)).zero_()
-#     target = one_hot.scatter_(1, labels.data, 1)
-#
-#     target = Variable(target)
-#
-#     return target
-
-# def one_hot(label, C=4):
-#     one_hot_t = torch.LongTensor(1, C) % 3
-#     one_hot_t = one_hot_t.zero_()
-#     if label == 0:
-#         one_hot_t[0, 0] = 1
-#     elif label == 1:
-#         one_hot_t[0, 1] = 1
-#     elif label == 2:
-#         one_hot_t[0, 2] = 1
-#     elif label == 3:
-#         one_hot_t[0, 3] = 1
-#
-#     return one_hot_t
 

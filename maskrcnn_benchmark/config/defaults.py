@@ -21,6 +21,9 @@ from yacs.config import CfgNode as CN
 _C = CN()
 
 _C.MODEL = CN()
+_C.MODEL.IS_CAT = False
+_C.MODEL.SIDE = False
+_C.MODEL.PREDICTOR_NUM = 2
 _C.MODEL.RPN_ONLY = False
 _C.MODEL.MASK_ON = False
 _C.MODEL.RETINANET_ON = False
@@ -32,8 +35,8 @@ _C.MODEL.CLS_AGNOSTIC_BBOX_REG = False
 # If the WEIGHT starts with a catalog://, like :R-50, the code will look for
 # the path in paths_catalog. Else, it will use it as the specified absolute
 # path
-# _C.MODEL.WEIGHT = ""
-_C.MODEL.WEIGHT = "/data6/SRIP_SelfDriving/Outputs/model_final.pth"
+_C.MODEL.WEIGHT = ""
+# _C.MODEL.WEIGHT = "/data6/SRIP_SelfDriving/Outputs/model_final.pth"
 
 
 # -----------------------------------------------------------------------------
@@ -41,13 +44,13 @@ _C.MODEL.WEIGHT = "/data6/SRIP_SelfDriving/Outputs/model_final.pth"
 # -----------------------------------------------------------------------------
 _C.INPUT = CN()
 # Size of the smallest side of the image during training
-_C.INPUT.MIN_SIZE_TRAIN = (800,)  # (800,)
+_C.INPUT.MIN_SIZE_TRAIN = (720,)  # (800,)
 # Maximum size of the side of the image during training
-_C.INPUT.MAX_SIZE_TRAIN = 1333
+_C.INPUT.MAX_SIZE_TRAIN = 1280
 # Size of the smallest side of the image during testing
-_C.INPUT.MIN_SIZE_TEST = 800
+_C.INPUT.MIN_SIZE_TEST = 720
 # Maximum size of the side of the image during testing
-_C.INPUT.MAX_SIZE_TEST = 1333
+_C.INPUT.MAX_SIZE_TEST = 1280
 # Values to be used for image normalization
 _C.INPUT.PIXEL_MEAN = [102.9801, 115.9465, 122.7717]
 # Values to be used for image normalization
@@ -457,6 +460,8 @@ _C.OUTPUT_DIR = "/data6/SRIP19_SelfDriving/Outputs/"
 _C.PATHS_CATALOG = os.path.join(os.path.dirname(__file__), "paths_catalog.py")
 
 _C.TENSORBOARD_LOGDIR = "logs"
+
+_C.MODEL.BOX_HEAD_POSTPROCESSOR = False
 
 # ---------------------------------------------------------------------------- #
 # Precision options

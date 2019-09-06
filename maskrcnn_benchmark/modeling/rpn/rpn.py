@@ -116,7 +116,9 @@ class RPNModule(torch.nn.Module):
         super(RPNModule, self).__init__()
 
         self.cfg = cfg.clone()
-
+        print("RPN training")
+        print(self.training)
+        self.training = False
         anchor_generator = make_anchor_generator(cfg)
 
         rpn_head = registry.RPN_HEADS[cfg.MODEL.RPN.RPN_HEAD]

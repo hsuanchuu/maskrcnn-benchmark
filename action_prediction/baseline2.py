@@ -10,14 +10,14 @@ class baseline(nn.Module):
     class_num = # actions
     """
 
-    def __init__(self, config, class_num=2, is_cat=True, is_feature=False):
+    def __init__(self, config, class_num=4, is_cat=False, is_feature=False):
         super(baseline, self).__init__()
         self.class_num = class_num  # number of actions
         self.is_cat = is_cat
         self.is_feature = is_feature
         
         # conv layers
-        stage = resnet.StageSpec(index=4, block_count=3, return_features=False)
+        '''stage = resnet.StageSpec(index=4, block_count=3, return_features=False)
         self.head = ResNetHead(
             block_module=config.MODEL.RESNETS.TRANS_FUNC,
             stages=(stage,),
@@ -27,28 +27,14 @@ class baseline(nn.Module):
             stride_init=None,
             res2_out_channels=config.MODEL.RESNETS.RES2_OUT_CHANNELS,
             dilation=config.MODEL.RESNETS.RES5_DILATION) # TODO: specify the arguments here! output: (1, 2048, 14, 14)
-        self.head.load_state_dict(torch.load('/data6/SRIP19_SelfDriving/Outputs/layer4.pth'))
+        self.head.load_state_dict(torch.load('/data6/SRIP19_SelfDriving/Outputs/layer4.pth'))'''
         self.selector = Selector()
         self.softmax = nn.Softmax(dim=0)
-
-        # self.avg_glob = nn.AdaptiveAvgPool2d(output_size=7)
-
-
-        '''if not self.is_cat:
-            self.avgpool1 = nn.AdaptiveAvgPool3d(output_size=1)
-            self.fc1 = nn.Linear(2048+1024, 256)
-            self.relu1 = nn.PReLU(256)
-            self.avgpool2 = nn.AdaptiveAvgPool2d(output_size=1)
-        else:
-            self.avgpool1 = nn.AdaptiveAvgPool2d(output_size=1)
-            self.fc1 = nn.Linear(2048*6, 256)
-            self.relu1 = nn.PReLU(256)
-
+        self.avgpool1 = nn.AdaptiveAvgPool2d(output_size=1)
+        self.avgpool2 = nn.AdaptiveAvgPool2d(output_size=1)
+        self.fc1 = nn.Linear(6*1024, 256)
         self.drop = nn.Dropout(p=0.5)
-        self.fc2 = nn.Linear(256, self.class_num)'''
-        self.avg = nn.AdaptiveAvgPool2d(output_size=1)
-        self.drop = nn.Dropout(p=0.25)
-        self.fc = nn.Linear(2048, self.class_num)
+        self.action_pred = nn.Linear(256, 4)
         
         
 
@@ -66,49 +52,26 @@ class baseline(nn.Module):
                                     # x.shape = (Batchsize, 1024, 14, 14) if cat=False
         
         obj = x[:-1] # shape (N, 1024, 14, 14)
-        glob = x[-1].unsqueeze(0) # shape(1, 1024, 14, 14)
+        glo = x[-1] # shape(1, 1024, 14, 14)
         
         scores = self.selector(obj)
-        scores, idx = torch.sort(scores, dim=0, descending=True)
-        scores_logits = self.softmax(scores)
-        idx = idx[:5].reshape(5)
-        obj = obj[idx] # shape (5, 1024, 14, 14)
+        scores, idx = torch.sort(scores, dim=0, descending=True) # from the greatest to the smallest
+        scores_logits = self.softmax(scores) 
+        idx = idx[:5].reshape(5) # choose top 5
+        obj = obj[idx] # shape (5, 1024, 14, 14) # choose top 5 objects
         obj = scores_logits[:5] * obj # shape (5, 1024, 14, 14)
-
-        # glob = self.avg_glob(glo)
-
-        x = torch.sum(obj, dim=0)
-        x = x + glob
-        x = self.head(x) # (1, 2048, 7, 7)
-        x = self.avg(x) # (1, 2048, 1 ,1)
-        x = x.view(x.size(0), -1)
-        pred = self.drop(self.fc(x))
-
-        '''if not self.is_cat:
-            x = self.head(obj)  # out: x.shape = (5, 2048, 7, 7)
-            # x = torch.cat((x, glob[0]), dim=1) #
-            x = x.transpose(1,0)# shape(2048, 5, 7, 7)
-            x = self.avgpool1(x) # out: x.shape = (2048, 1, 1, 1)
-            x = x.view(x.size(1), -1) # shape (1, 2048)
-            glo = self.avgpool2(glo) # shape(1024, 1, 1)
-            glo = glo.reshape(1, -1) # shape(1, 1024)
-            x = torch.cat((x, glo), dim=1) # shape(1, 2048+1024)
-            x = self.fc1(x)
-            x = self.relu1(x)
-            x = self.drop(x)
-            pred = self.fc2(x) # shape(1, 4)
-        else:
-            # print("obj:", obj.shape)
-            # print("glo:", glo.shape)
-            x = torch.cat((obj, glo.unsqueeze(0)), dim=0) # shape(6, 1024, 14 ,14)
-            x = self.head(x) # shape(6, 2048, 7, 7)
-            x = self.avgpool1(x) # shape (6, 2048, 1, 1)
-            x = x.reshape(1, 6*2048) # shape(1, 2048*6, 1, 1)
-            x = self.fc1(x) # shape(1, 256, 1, 1)
-            x = self.relu1(x)
-            x = self.drop(x)
-            pred = self.fc2(x)'''
-
+        
+        x = self.avgpool1(obj) # (5, 1024, 1, 1)
+        x = x.reshape(x.size(0), -1) # (5, 1024)
+        glo = self.avgpool2(glo) # shape(1024, 1, 1)
+        glo = glo.reshape(1, -1) # shape(1, 1024)
+        #print('x', x.shape)
+        #print('glo', glo.shape)
+        x = torch.cat((x, glo), dim=0) # shape(6, 1024)
+        x = x.reshape(1, -1) # (1, 6*1024,)
+        x = self.fc1(x) #(1, 256,)
+        x = self.drop(x)
+        pred = self.action_pred(x) # shape(1, 4)
                            
         return pred
 
@@ -137,19 +100,17 @@ class baseline(nn.Module):
 
 class Selector(nn.Module):
     """
-    Selector is used to create sparse object attetion.
+    Selector is used to create sparse object attention.
     """
     def __init__(self):
         super(Selector, self).__init__()
         self.conv1 = nn.Conv2d(1024, 1, 14)
-        self.relu1 = nn.ReLU()
         
     def forward(self, x):
         """
         x(Tensor) is ROI-Pooled features with shape e.g. (N, 1024, 14, 14) 
         """
-        x = self.conv1(x)
-        weights = self.relu1(x)
+        weights = self.conv1(x)
         
         return weights
         

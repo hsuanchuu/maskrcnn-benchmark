@@ -10,7 +10,7 @@ class baseline(nn.Module):
     class_num = # actions
     """
 
-    def __init__(self, config, class_num=2, is_cat=True, is_feature=False):
+    def __init__(self, config, class_num=4, is_cat=False, is_feature=False):
         super(baseline, self).__init__()
         self.class_num = class_num  # number of actions
         self.is_cat = is_cat
@@ -31,24 +31,25 @@ class baseline(nn.Module):
         self.selector = Selector()
         self.softmax = nn.Softmax(dim=0)
 
-        # self.avg_glob = nn.AdaptiveAvgPool2d(output_size=7)
 
-
-        '''if not self.is_cat:
+        if not self.is_cat:
             self.avgpool1 = nn.AdaptiveAvgPool3d(output_size=1)
-            self.fc1 = nn.Linear(2048+1024, 256)
-            self.relu1 = nn.PReLU(256)
-            self.avgpool2 = nn.AdaptiveAvgPool2d(output_size=1)
+            self.conv1 = nn.Conv2d(2048+1024, 512, 3)
+            self.relu1 = nn.PReLU(512)
+            #self.avgpool2 = nn.AdaptiveAvgPool2d(output_size=1)
+            self.drop = nn.Dropout(p=0.5)
+            self.fc1 = nn.Linear(512, 512)
+            self.relu_1 = nn.PReLU(512)
+            self.fc2 = nn.Linear(512, 4)
         else:
             self.avgpool1 = nn.AdaptiveAvgPool2d(output_size=1)
-            self.fc1 = nn.Linear(2048*6, 256)
-            self.relu1 = nn.PReLU(256)
+            self.conv1 = nn.Conv2d(2048, 512, 1)
+            self.relu1 = nn.PReLU(512)
+            self.drop = nn.Dropout(p=0.5)
+            self.fc1 = nn.Linear(512*6, 512)
+            self.relu_1 = nn.PReLU(512)
+            self.fc2 = nn.Linear(512, 4)
 
-        self.drop = nn.Dropout(p=0.5)
-        self.fc2 = nn.Linear(256, self.class_num)'''
-        self.avg = nn.AdaptiveAvgPool2d(output_size=1)
-        self.drop = nn.Dropout(p=0.25)
-        self.fc = nn.Linear(2048, self.class_num)
         
         
 
@@ -66,7 +67,7 @@ class baseline(nn.Module):
                                     # x.shape = (Batchsize, 1024, 14, 14) if cat=False
         
         obj = x[:-1] # shape (N, 1024, 14, 14)
-        glob = x[-1].unsqueeze(0) # shape(1, 1024, 14, 14)
+        glo = x[-1] # shape(1, 1024, 14, 14)
         
         scores = self.selector(obj)
         scores, idx = torch.sort(scores, dim=0, descending=True)
@@ -75,39 +76,36 @@ class baseline(nn.Module):
         obj = obj[idx] # shape (5, 1024, 14, 14)
         obj = scores_logits[:5] * obj # shape (5, 1024, 14, 14)
 
-        # glob = self.avg_glob(glo)
-
-        x = torch.sum(obj, dim=0)
-        x = x + glob
-        x = self.head(x) # (1, 2048, 7, 7)
-        x = self.avg(x) # (1, 2048, 1 ,1)
-        x = x.view(x.size(0), -1)
-        pred = self.drop(self.fc(x))
-
-        '''if not self.is_cat:
-            x = self.head(obj)  # out: x.shape = (5, 2048, 7, 7)
-            # x = torch.cat((x, glob[0]), dim=1) #
-            x = x.transpose(1,0)# shape(2048, 5, 7, 7)
-            x = self.avgpool1(x) # out: x.shape = (2048, 1, 1, 1)
-            x = x.view(x.size(1), -1) # shape (1, 2048)
-            glo = self.avgpool2(glo) # shape(1024, 1, 1)
-            glo = glo.reshape(1, -1) # shape(1, 1024)
-            x = torch.cat((x, glo), dim=1) # shape(1, 2048+1024)
-            x = self.fc1(x)
-            x = self.relu1(x)
+        if not self.is_cat:
+            obj = torch.mean(obj, dim=0) # shape(1, 1024, 14, 14)
+            x = torch.cat((obj, glo.unsqueeze(0)), dim=0) # shape(2, 1024, 14 ,14)
+            x = self.head(x) # shape(2, 2048, 7, 7)
+            x = self.conv1(x) # shape(2, 512,)
+            x = self.relu1(x) 
+            x = obj.transpose(1, 0) # shape(512, 2, )
+            x = self.avgpool1(x) # shape(512, 1, 1, 1)
+            x = x.reshape(1, -1) # shape(1, 512)
+            x = self.fc1(x) # shape(1, 512)
+            x = self.relu_1(x)
             x = self.drop(x)
-            pred = self.fc2(x) # shape(1, 4)
+            pred = self.fc2(x) # shape(1, 4)            
+            
         else:
             # print("obj:", obj.shape)
             # print("glo:", glo.shape)
             x = torch.cat((obj, glo.unsqueeze(0)), dim=0) # shape(6, 1024, 14 ,14)
             x = self.head(x) # shape(6, 2048, 7, 7)
-            x = self.avgpool1(x) # shape (6, 2048, 1, 1)
-            x = x.reshape(1, 6*2048) # shape(1, 2048*6, 1, 1)
-            x = self.fc1(x) # shape(1, 256, 1, 1)
+            x = self.conv1(x) # shape (6, 512, 5, 5)
+            # print(x.shape)
             x = self.relu1(x)
+            x = self.avgpool1(x) # shape (6, 512, 1, 1)
+            x = x.reshape(1, 6*512) # shape(1, 512*6, 1, 1)
+            x = self.fc1(x)
+            # print(x.shape)
+            # print(self.relu_1)
+            x = self.relu_1(x) # shape(1, 512*6, 1, 1)
             x = self.drop(x)
-            pred = self.fc2(x)'''
+            pred = self.fc2(x) # shape(1, 4)
 
                            
         return pred
@@ -142,14 +140,12 @@ class Selector(nn.Module):
     def __init__(self):
         super(Selector, self).__init__()
         self.conv1 = nn.Conv2d(1024, 1, 14)
-        self.relu1 = nn.ReLU()
         
     def forward(self, x):
         """
         x(Tensor) is ROI-Pooled features with shape e.g. (N, 1024, 14, 14) 
         """
-        x = self.conv1(x)
-        weights = self.relu1(x)
+        weights = self.conv1(x)
         
         return weights
         

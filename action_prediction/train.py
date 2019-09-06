@@ -28,6 +28,8 @@ from dataloader import BatchLoader
 import torch.optim as optim
 
 def train(cfg, args):
+    # torch.cuda.set_device(5)
+
     detector = build_detection_model(cfg)
     #print(detector)
     detector.eval()
@@ -35,9 +37,9 @@ def train(cfg, args):
     detector.to(device)
     outdir = cfg.OUTPUT_DIR
 
-    checkpointer = DetectronCheckpointer(cfg, detector, save_dir=outdir)
-    ckpt = cfg.MODEL.WEIGHT
-    _ = checkpointer.load(ckpt)
+    # checkpointer = DetectronCheckpointer(cfg, detector, save_dir=outdir)
+    # ckpt = cfg.MODEL.WEIGHT
+    # _ = checkpointer.load(ckpt)
 
     # Initialize the network
     model = baseline()
@@ -49,8 +51,8 @@ def train(cfg, args):
     optimizer = optim.Adam(model.parameters(), lr=float(args.initLR), weight_decay=0.001)
     
     # Initialize image batch
-    # imBatch = Variable(torch.FloatTensor(args.batch_size, 3, args.imHeight, args.imWidth))
-    imBatch = Variable(torch.FloatTensor(args.batch_size, 3, 736, 1280))
+    imBatch = Variable(torch.FloatTensor(args.batch_size, 3, args.imHeight, args.imWidth))
+    # imBatch = Variable(torch.FloatTensor(args.batch_size, 3, 736, 1280))
     targetBatch = Variable(torch.LongTensor(args.batch_size, 1))
     
     # Move network and batch to gpu
@@ -83,8 +85,9 @@ def train(cfg, args):
             #     img_list = to_image_list(img_cpu[0,:,:], cfg.DATALOADER.SIZE_DIVISIBILITY)
             # else:
             #     img_list = to_image_list(img_cpu, cfg.DATALOADER.SIZE_DIVISIBILITY)
-            img_list = to_image_list(img_cpu[0,:,:], cfg.DATALOADER.SIZE_DIVISIBILITY)
-            imBatch.data.copy_(img_list.tensors) # Tensor.shape(BatchSize, 3, Height, Width)
+            # img_list = to_image_list(img_cpu[0,:,:], cfg.DATALOADER.SIZE_DIVISIBILITY)
+            # imBatch.data.copy_(img_list.tensors) # Tensor.shape(BatchSize, 3, Height, Width)
+            imBatch.data.copy_(img_cpu)
 
             
             target_cpu = dataBatch['target']
@@ -186,7 +189,8 @@ def main():
     parser = argparse.ArgumentParser(description="Action Prediction Training")
     parser.add_argument(
         "--config-file",
-        default="/home/SelfDriving/maskrcnn/maskrcnn-benchmark/configs/e2e_faster_rcnn_R_101_FPN_1x.yaml",
+        # default="/home/SelfDriving/maskrcnn/maskrcnn-benchmark/configs/e2e_faster_rcnn_R_101_FPN_1x.yaml",
+        default="/home/SelfDriving/maskrcnn/maskrcnn-benchmark/configs/e2e_faster_rcnn_R_50_C4_1x.yaml",
         metavar="FILE",
         help="path to maskrcnn_benchmark config file",
         type=str,

@@ -4,6 +4,8 @@ import time
 import os
 
 import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 import torch
 import torch.nn as nn
 from tqdm import tqdm
@@ -15,6 +17,23 @@ from ..utils.comm import all_gather
 from ..utils.comm import synchronize
 from ..utils.timer import Timer, get_time_str
 from .bbox_aug import im_detect_bbox_aug
+
+
+# def DrawBbox(img, boxlist, folder, k):
+#     fig = plt.figure()
+#     plt.imshow(img)
+#     currentAxis = plt.gca()
+#     for i in range(boxlist.shape[0]):
+#         bbox = boxlist[i]
+#         rect = patches.Rectangle((bbox[0], bbox[1]), bbox[2] - bbox[0], bbox[3] - bbox[1], linewidth=1, edgecolor='r',
+#                                  facecolor='none')
+#         # rect = patches.Rectangle((bbox[1], bbox[0]), bbox[3]-bbox[1], bbox[2]-bbox[0], linewidth=1, edgecolor='r', facecolor='none')
+#         currentAxis.add_patch(rect)
+#     print('Saving... ', k)
+#     plt.savefig((folder + str(k) + '.jpg'), bbox_inches='tight')
+#     plt.clf()
+
+
 
 class SimpleHook(object):
     """
@@ -41,9 +60,19 @@ def compute_on_dataset(model, data_loader, device, timer=None, get_feature=False
     cpu_device = torch.device("cpu")
     RoIPool = model.roi_heads.box.feature_extractor.pooler
     Backbone = model.backbone
+    count = 0
 
-    for _, batch in enumerate(tqdm(data_loader)):
+    for i, batch in enumerate(tqdm(data_loader)):
         images, targets, image_ids = batch
+        # folder = '/data6/SRIP19_SelfDriving/bdd100k/Outputs/inference/bdd100k_val/images/'
+        # plt.imsave((folder + str(i) + '.jpg'), images.tensors.cpu().numpy()[0].transpose(1,2,0).astype(np.uint8))
+        # if i == 0:
+        #     from PIL import Image
+        #     from maskrcnn_benchmark.structures.image_list import to_image_list
+        #     import numpy as np
+        #     images = Image.open('/data6/SRIP19_SelfDriving/bdd12k/data1/aaddb12e-82dd1431_3.jpg')
+        #     images = to_image_list(torch.Tensor(np.array(images).transpose(2,0,1)))
+
         with torch.no_grad():
             if timer:
                 timer.tic()
@@ -72,10 +101,22 @@ def compute_on_dataset(model, data_loader, device, timer=None, get_feature=False
                 if not cfg.MODEL.DEVICE == 'cpu':
                     torch.cuda.synchronize()
                 timer.toc()
+            # print(output.bbox)
+            # print(len(output))
             output = [o.to(cpu_device) for o in output]
+            # bbox = output[0].bbox.cpu().numpy()
+            # np.save((folder + str(i) + '.npy'), bbox)
+
+            # img = images.tensors.cpu().numpy()[0].transpose(1,2,0).astype(np.uint8)
+            # DrawBbox(img, bbox, folder, i)
+            # print(bbox)
+            # print(bbox.shape)
+            # print(output)
+            # print(type(output))
         results_dict.update(
             {img_id: result for img_id, result in zip(image_ids, output)}
         )
+        count += 1
     return results_dict
 
 
@@ -151,6 +192,7 @@ def inference(
 
     if output_folder:
         torch.save(predictions, os.path.join(output_folder, "predictions.pth"))
+        # torch.save(images, os.path.join(output_folder, "images.pth"))
 
     extra_args = dict(
         box_only=box_only,

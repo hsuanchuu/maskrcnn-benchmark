@@ -122,6 +122,8 @@ def run_test(cfg, model, distributed):
 
 
 def main():
+    torch.cuda.set_device(7)
+
     parser = argparse.ArgumentParser(description="PyTorch Object Detection Training")
     parser.add_argument(
         "--config-file",
@@ -153,6 +155,7 @@ def main():
         torch.cuda.set_device(args.local_rank)
         torch.distributed.init_process_group(
             backend="nccl", init_method="env://"
+
         )
         synchronize()
 

@@ -4,7 +4,7 @@ from torch import nn
 
 from .roi_box_feature_extractors import make_roi_box_feature_extractor
 from .roi_box_predictors import make_roi_box_predictor
-from .inference import make_roi_box_post_processor
+from .inference_v1 import make_roi_box_post_processor
 from .loss import make_roi_box_loss_evaluator
 
 
@@ -50,7 +50,7 @@ class ROIBoxHead(torch.nn.Module):
         class_logits, box_regression = self.predictor(x)
 
         if not self.training:
-            result = self.post_processor((class_logits, box_regression), proposals)
+            result = self.post_processor((class_logits, box_regression), proposals) # result is a tuple(BoxList, idxs)
             return x, result, {}
 
         loss_classifier, loss_box_reg = self.loss_evaluator(
